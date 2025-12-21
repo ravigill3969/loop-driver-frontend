@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useAuth } from "./userContext";
 
 interface TripRequestDataI {
+  type: string;
   driver_id: string;
   dropoff_lat: number;
   dropoff_lng: number;
@@ -15,6 +16,9 @@ interface TripRequestDataI {
   rider_gender: string;
   rider_id: string;
   rider_name: string;
+  pickup_location: string;
+  dropoff_location: string;
+  trip_id: string;
 }
 
 export type WSContextType = {
@@ -59,17 +63,25 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     };
 
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      console.log("WS message:", data);
-      set_trip_request_data(event.data);
-      set_showpop_up(true);
+      try {
+        const data = JSON.parse(event.data) as TripRequestDataI;
+
+        if (!data.trip_id) return; // ignore noise / heartbeats
+
+        if (data.type === "TRIP_REQUEST") {
+          set_trip_request_data(data);
+          set_showpop_up(true);
+        }
+      } catch (err) {
+        console.error("Invalid WS payload", err);
+      }
     };
 
     return () => {
       ws.close();
       wsRef.current = null;
-      set_showpop_up(false);
-      set_trip_request_data(null);
+      // set_showpop_up(false);
+      // set_trip_request_data(null);
     };
   }, [user?.user_id]);
 

@@ -22,7 +22,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
 
   const ensureMap = useCallback(
-    (options?: {
+    (options?: {  
       containerId?: string;
       center?: [number, number];
       zoom?: number;

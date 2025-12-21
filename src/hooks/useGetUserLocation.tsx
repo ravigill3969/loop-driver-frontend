@@ -4,7 +4,6 @@ export default function useGetUserLocation() {
   const [lat_lng, setLat_lng] = useState<[number, number] | null>(null);
 
   useEffect(() => {
-    console.log("firing getting location")
     function success(e: GeolocationPosition) {
       const { latitude, longitude } = e.coords;
       setLat_lng([latitude, longitude]);

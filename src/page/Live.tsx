@@ -8,6 +8,8 @@ import { Link } from "react-router";
 import { useUpdateUserLocationRedis } from "@/API/auth-api";
 import { useAuth } from "@/context/userContext";
 import { useMap } from "@/context/MapContext";
+import { useWebSocket } from "@/context/WebSocket";
+import { useNavigate } from "react-router";
 
 type LiveProps = {
   isDriverLive: boolean;
@@ -15,13 +17,13 @@ type LiveProps = {
 };
 
 function Live({ isDriverLive, setIsOnline }: LiveProps) {
-  // const ws = useContext(WebSocketContext)
-
+  
   const { driver_details, user } = useAuth();
   // const [location_alert, set_location_alert] = useState(false)
   const [liveCoords, setLiveCoords] = useState<[number, number] | null>(null);
+  const navigate = useNavigate()
 
-  const coords  = useGetUserLocation(); // initial [lat, lng]
+  const coords = useGetUserLocation(); // initial [lat, lng]
 
   const { mapRef, ensureMap } = useMap();
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
@@ -114,6 +116,25 @@ function Live({ isDriverLive, setIsOnline }: LiveProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coords, driver_details, user, liveCoords, isDriverLive]);
 
+  const { send, showpop_up, trip_request_data } = useWebSocket();
+
+  console.log(trip_request_data);
+
+  function acceptTrip(tripId: string) {
+    navigate("/on-route")
+    send({
+      type: "TRIP_ACCEPTED",
+      trip_id: tripId,
+    });
+  }
+
+  function rejectTrip(tripId: string) {
+    send({
+      type: "TRIP_REJECTED",
+      trip_id: tripId,
+    });
+  }
+
   return (
     <div className="pointer-events-none fixed inset-0">
       <div className="fixed bottom-5 right-5 flex flex-col gap-3 pointer-events-auto z-20">
@@ -157,6 +178,63 @@ function Live({ isDriverLive, setIsOnline }: LiveProps) {
           <button onClick={() => setIsOnline(false)} className="btn-donate">
             Go offline
           </button>
+        </div>
+      )}
+      {showpop_up && trip_request_data && (
+        <div className="fixed inset-0 flex items-center justify-center z-30 pointer-events-auto">
+          {/* backdrop */}
+
+          <div className="relative w-full max-w-sm rounded-2xl bg-white shadow-xl p-5 space-y-4">
+            <h3 className="text-lg font-semibold">New Trip Request</h3>
+
+            <div className="text-sm space-y-2">
+              <div>
+                <span className="font-medium">Pickup:</span>
+                <div className="text-gray-600">
+                  {trip_request_data.pickup_location}
+                </div>
+              </div>
+
+              <div>
+                <span className="font-medium">Dropoff:</span>
+                <div className="text-gray-600">
+                  {trip_request_data.dropoff_location}
+                </div>
+              </div>
+
+              <div className="flex justify-between text-gray-700">
+                <span>Distance</span>
+                <span>{trip_request_data.estimated_distance_km} km</span>
+              </div>
+
+              <div className="flex justify-between text-gray-700">
+                <span>Duration</span>
+                <span>{trip_request_data.estimated_duration_min} min</span>
+              </div>
+
+              <div className="flex justify-between font-semibold">
+                <span>Fare</span>
+                <span>${trip_request_data.estimated_price}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                onClick={() => acceptTrip(trip_request_data.trip_id)}
+              >
+                Accept
+              </Button>
+
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => rejectTrip(trip_request_data.trip_id)}
+              >
+                Reject
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

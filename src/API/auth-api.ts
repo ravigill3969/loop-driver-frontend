@@ -1,7 +1,11 @@
-import { backend_url } from "@/global/env";
+import { backend_url } from "../global/env";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  DriverRedisStatus,
   DriverResponse,
+  GetDriverStatusFroRedisError,
+  GoingOfflineResponse,
+  GoingOfflineResponseError,
   UpdateUserLocationRedisRequest,
 } from "./auth-api-types";
 
@@ -69,7 +73,7 @@ export function useGetDriverInfo() {
 
 export function useUpdateUserLocationRedis() {
   const updateUserLocationRedis = async (
-    data: UpdateUserLocationRedisRequest
+    data: UpdateUserLocationRedisRequest,
   ): Promise<void> => {
     const res = await fetch(
       `${backend_url}/api/v1/update-redis/driver-location-details`,
@@ -80,7 +84,7 @@ export function useUpdateUserLocationRedis() {
           "Content-type": "application/json",
         },
         body: JSON.stringify(data),
-      }
+      },
     );
 
     const response = await res.json();
@@ -95,6 +99,63 @@ export function useUpdateUserLocationRedis() {
   const mutation = useMutation({
     mutationFn: updateUserLocationRedis,
     mutationKey: ["updateUserLocationRedis"],
+  });
+
+  return mutation;
+}
+
+export function useGetDriverStatusFromRedis() {
+  const getDriverStatusFromRedis = async (): Promise<DriverRedisStatus> => {
+    const response = await fetch(`${backend_url}/api/v1/redis-driver-status`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    const res = await response.json();
+
+    if (!response.ok) {
+      const err: GetDriverStatusFroRedisError = {
+        error: res.error,
+        message: res.message,
+      };
+      throw new Error(err.message || "Internal server error");
+    }
+
+    return res === "online" ? "online" : "offline";
+  };
+
+  const query = useQuery({
+    queryKey: ["getDriverStatusFromRedis"],
+    queryFn: getDriverStatusFromRedis,
+    refetchOnWindowFocus: false,
+  });
+
+  return query;
+}
+
+export function useGoingOffline() {
+  const goingOffline = async (): Promise<GoingOfflineResponse> => {
+    const response = await fetch(`${backend_url}/api/v1/redis-driver-offline`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    const res = await response.json();
+
+    if (!response.ok) {
+      const err: GoingOfflineResponseError = {
+        error: res.error,
+        message: res.message,
+      };
+      throw new Error(err.message || "Internal server error");
+    }
+
+    return res;
+  };
+
+  const mutation = useMutation({
+    mutationKey: ["goingOffline"],
+    mutationFn: goingOffline,
   });
 
   return mutation;

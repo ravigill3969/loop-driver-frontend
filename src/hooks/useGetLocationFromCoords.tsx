@@ -40,7 +40,7 @@ export function useGetLocationFromCoords(
 
         const context = feature.context || [];
         const get = (id: string) =>
-          context.find((c: any) => c.id.startsWith(id))?.text;
+          context.find((c : any) => c.id.startsWith(id))?.text;
 
         if (!cancelled) {
           setLocation({

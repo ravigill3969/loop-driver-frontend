@@ -34,6 +34,7 @@ export interface Coordinates {
 }
 
 export interface UpdateUserLocationRedisRequest {
+  driver_id: string;
   name: string;
   car_make: string;
   car_model: string;
@@ -42,7 +43,24 @@ export interface UpdateUserLocationRedisRequest {
 
   lat_lng: Coordinates;
   last_updated: number;
-  status: "available" | "busy" | "offline";
+  status: "available" | "busy";
   is_online: boolean;
   current_trip: string;
+  current_rider: string;
+}
+
+export interface GetDriverStatusFroRedisError {
+  message: string;
+  error: string;
+}
+
+export type DriverRedisStatus = "online" | "offline";
+
+export interface GoingOfflineResponseError{
+  message: string;
+  error: string;
+}
+
+export interface GoingOfflineResponse {
+  success: boolean;
 }

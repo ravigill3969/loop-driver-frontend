@@ -1,7 +1,14 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useAuth } from "./userContext";
 
-interface TripRequestDataI {
+export interface TripRequestDataI {
   type: string;
   driver_id: string;
   dropoff_lat: number;
@@ -26,9 +33,10 @@ export type WSContextType = {
   connected: boolean;
   trip_request_data: TripRequestDataI | null;
   showpop_up: boolean;
+  setTripRequestData: (tripData: TripRequestDataI | null) => void;
 };
 
-export const WebSocketContext = createContext<WSContextType | null>(null);
+const WebSocketContext = createContext<WSContextType | null>(null);
 
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const wsRef = useRef<WebSocket | null>(null);
@@ -38,6 +46,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
   const [showpop_up, set_showpop_up] = useState(false);
   const { user } = useAuth();
+
+  const hardReloadHome = useCallback(() => {
+    window.location.assign("/");
+  }, []);
 
   useEffect(() => {
     if (!user?.user_id) return;
@@ -72,6 +84,11 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
           set_trip_request_data(data);
           set_showpop_up(true);
         }
+        if (data.type === "TRIP_CANCELED_BY_RIDER") {
+          set_trip_request_data(null);
+          set_showpop_up(false);
+          hardReloadHome()
+        }
       } catch (err) {
         console.error("Invalid WS payload", err);
       }
@@ -95,7 +112,13 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <WebSocketContext.Provider
-      value={{ send, connected, trip_request_data, showpop_up }}
+      value={{
+        send,
+        connected,
+        trip_request_data,
+        showpop_up,
+        setTripRequestData: set_trip_request_data,
+      }}
     >
       {children}
     </WebSocketContext.Provider>

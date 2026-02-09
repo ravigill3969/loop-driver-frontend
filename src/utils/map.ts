@@ -33,5 +33,3 @@ export async function getRoute(
     } as Feature<LineString>,
   };
 }
-
-//geocode to full address

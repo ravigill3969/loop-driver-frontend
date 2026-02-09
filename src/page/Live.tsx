@@ -1,44 +1,101 @@
 import mapboxgl from "mapbox-gl";
+import { useCallback, useEffect, useRef } from "react";
+import { Link, useNavigate } from "react-router";
+import { AlertTriangle, LocateFixed, Navigation, User } from "lucide-react";
 
-import { useEffect, useRef, useState } from "react";
-import useGetUserLocation from "../hooks/useGetUserLocation";
-import { Button } from "@/components/ui/button";
-import { Navigation, User } from "lucide-react";
-import { Link } from "react-router";
-import { useUpdateUserLocationRedis } from "@/API/auth-api";
+import { useGoingOffline, useUpdateUserLocationRedis } from "@/API/auth-api";
 import { useAuth } from "@/context/userContext";
 import { useMap } from "@/context/MapContext";
 import { useWebSocket } from "@/context/WebSocket";
-import { useNavigate } from "react-router";
+import { Button } from "@/components/ui/button";
+import { useAcceptTripRequest } from "@/API/trip-api";
+import { useGetUserLiveLocation } from "@/hooks/useGetUserLocation";
 
 type LiveProps = {
   isDriverLive: boolean;
   setIsOnline: (isDriverOnline: boolean) => void;
 };
 
-function Live({ isDriverLive, setIsOnline }: LiveProps) {
-  
-  const { driver_details, user } = useAuth();
-  // const [location_alert, set_location_alert] = useState(false)
-  const [liveCoords, setLiveCoords] = useState<[number, number] | null>(null);
-  const navigate = useNavigate()
+const DEFAULT_MAP_CENTER: [number, number] = [-79.383184, 43.653226];
 
-  const coords = useGetUserLocation(); // initial [lat, lng]
+function Live({ isDriverLive, setIsOnline }: LiveProps) {
+  const { driver_details, user } = useAuth();
+  const { mutate } = useAcceptTripRequest();
+  const {
+    latLng: liveCoords,
+    error: locationError,
+    status: locationStatus,
+    requestLocationAccess,
+  } = useGetUserLiveLocation();
 
   const { mapRef, ensureMap } = useMap();
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const locationIntervalRef = useRef<number | null>(null);
+  const hasSentOnlineUpdateRef = useRef(false);
+  const latestCoordsRef = useRef<[number, number] | null>(null);
+  const latestDriverDetailsRef = useRef(driver_details);
+  const latestUserNameRef = useRef(user?.full_name || "");
 
   const { mutate: updateUserLocationMutate } = useUpdateUserLocationRedis();
+  const { mutate: goOfflineMutate } = useGoingOffline();
+  const { send, showpop_up, trip_request_data } = useWebSocket();
+  const navigate = useNavigate();
+  const hasLiveCoords = !!liveCoords;
 
   useEffect(() => {
-    if (!coords) {
-      return;
-    }
+    latestCoordsRef.current = liveCoords;
+  }, [liveCoords]);
 
-    const [lat, lng] = coords;
-    const map = ensureMap({ containerId: "map", center: [lng, lat], zoom: 15 });
+  useEffect(() => {
+    latestDriverDetailsRef.current = driver_details;
+  }, [driver_details]);
 
+  useEffect(() => {
+    latestUserNameRef.current = user?.full_name || "";
+  }, [user?.full_name]);
+
+  const sendDriverLocationUpdate = useCallback(
+    (isOnline: boolean) => {
+      const coords = latestCoordsRef.current;
+      const currentDriverDetails = latestDriverDetailsRef.current;
+
+      if (!coords || !currentDriverDetails) return;
+
+      updateUserLocationMutate({
+        name: latestUserNameRef.current,
+        car_color: currentDriverDetails.vehicle_color,
+        car_make: currentDriverDetails.vehicle_make,
+        car_model: currentDriverDetails.vehicle_model,
+        car_plate: currentDriverDetails.license_plate,
+        current_trip: "",
+        is_online: isOnline,
+        status: "available",
+        last_updated: Date.now(),
+        lat_lng: {
+          lat: coords[0],
+          lng: coords[1],
+        },
+        current_rider: "",
+        driver_id: "",
+      });
+    },
+    [updateUserLocationMutate],
+  );
+
+  useEffect(() => {
+    const map = ensureMap({
+      containerId: "map",
+      center: DEFAULT_MAP_CENTER,
+      zoom: 12,
+    });
     map.resize();
+  }, [ensureMap]);
+
+  useEffect(() => {
+    if (!liveCoords) return;
+
+    const [lat, lng] = liveCoords;
+    const map = ensureMap({ containerId: "map", center: [lng, lat], zoom: 15 });
 
     if (!userMarkerRef.current) {
       userMarkerRef.current = new mapboxgl.Marker({
@@ -48,84 +105,65 @@ function Live({ isDriverLive, setIsOnline }: LiveProps) {
         .setLngLat([lng, lat])
         .addTo(map);
     }
-  }, [coords, ensureMap]);
+
+    userMarkerRef.current.setLngLat([lng, lat]);
+    map.easeTo({
+      center: [lng, lat],
+      zoom: 15,
+      duration: 800,
+    });
+  }, [ensureMap, liveCoords]);
 
   useEffect(() => {
-    if (!coords) return;
-    if (!mapRef.current) return;
-    if (!userMarkerRef.current) return;
+    if (locationIntervalRef.current) {
+      window.clearInterval(locationIntervalRef.current);
+      locationIntervalRef.current = null;
+    }
 
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
+    if (!isDriverLive) {
+      hasSentOnlineUpdateRef.current = false;
+      return;
+    }
 
-        setLiveCoords([latitude, longitude]);
-
-        // Move marker
-        userMarkerRef.current!.setLngLat([longitude, latitude]);
-
-        // Move camera smoothly
-        mapRef.current!.easeTo({
-          center: [longitude, latitude],
-          duration: 800,
-        });
-      },
-      (err) => {
-        console.log("GPS ERROR:", err);
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 10000,
-      },
-    );
-
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [coords, mapRef]);
-
-  // getRoute(liveCoords, next_stop, mapbox_access_token);
-
-  // TODO: Separate static driver profile (car + name) from live location updates.
-  // Only send lat/lng + status every few seconds. Move full driver metadata to a one-time setup API.
-
-  useEffect(() => {
     if (!driver_details) return;
     if (!liveCoords) return;
-    if (!isDriverLive) return;
 
-    // Interval runs every 15 seconds
-    const interval = setInterval(() => {
-      updateUserLocationMutate({
-        name: user?.full_name || "",
-        car_color: driver_details.vehicle_color,
-        car_make: driver_details.vehicle_make,
-        car_model: driver_details.vehicle_model,
-        car_plate: driver_details.license_plate,
-        current_trip: "",
-        is_online: true,
-        status: "available",
-        last_updated: Date.now(),
-        lat_lng: {
-          lat: liveCoords[0],
-          lng: liveCoords[1],
+    if (!hasSentOnlineUpdateRef.current) {
+      sendDriverLocationUpdate(true);
+      hasSentOnlineUpdateRef.current = true;
+    }
+
+    locationIntervalRef.current = window.setInterval(() => {
+      sendDriverLocationUpdate(true);
+    }, 15000);
+
+    return () => {
+      if (locationIntervalRef.current) {
+        window.clearInterval(locationIntervalRef.current);
+        locationIntervalRef.current = null;
+      }
+    };
+  }, [
+    driver_details,
+    isDriverLive,
+    sendDriverLocationUpdate,
+    hasLiveCoords,
+  ]);
+
+  function acceptTrip() {
+    if (trip_request_data) {
+      mutate(
+        {
+          driver_id: trip_request_data?.driver_id,
+          trip_id: trip_request_data?.trip_id,
         },
-      });
-    }, 5000);
-
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coords, driver_details, user, liveCoords, isDriverLive]);
-
-  const { send, showpop_up, trip_request_data } = useWebSocket();
-
-  console.log(trip_request_data);
-
-  function acceptTrip(tripId: string) {
-    navigate("/on-route")
-    send({
-      type: "TRIP_ACCEPTED",
-      trip_id: tripId,
-    });
+        {
+          onSuccess: () => {
+            navigate("/on-route", { replace: true });
+          },
+        },
+      );
+    }
   }
 
   function rejectTrip(tripId: string) {
@@ -135,39 +173,104 @@ function Live({ isDriverLive, setIsOnline }: LiveProps) {
     });
   }
 
+  function recenterMap() {
+    if (!mapRef.current) return;
+    const center: [number, number] = liveCoords
+      ? [liveCoords[1], liveCoords[0]]
+      : DEFAULT_MAP_CENTER;
+    const zoom = liveCoords ? 15 : 12;
+
+    mapRef.current.easeTo({
+      center,
+      zoom,
+      duration: 800,
+    });
+  }
+
+  function handleGoOffline() {
+    if (!isDriverLive) return;
+
+    setIsOnline(false);
+    hasSentOnlineUpdateRef.current = false;
+    goOfflineMutate();
+  }
+
+  const shouldShowPermissionNotice =
+    !liveCoords &&
+    (locationStatus === "blocked" ||
+      locationStatus === "unsupported" ||
+      locationStatus === "idle");
+  const shouldShowLocatingNotice =
+    locationStatus === "locating" && !liveCoords && !shouldShowPermissionNotice;
+  const locationNoticeTitle =
+    locationStatus === "idle"
+      ? "Unable to get live location"
+      : "Location access required";
+  const locationNoticeDescription =
+    locationStatus === "idle"
+      ? "Please keep GPS enabled and try again."
+      : "Please allow location access to share live updates on the map.";
+
   return (
     <div className="pointer-events-none fixed inset-0">
-      <div className="fixed bottom-5 right-5 flex flex-col gap-3 pointer-events-auto z-20">
-        {/*<div  >Please turn on location</div>*/}
-        <Button
-          className="p-5"
-          onClick={() => {
-            if (!coords || !mapRef.current) return;
-            const [lat, lng] = coords;
+      {shouldShowPermissionNotice && (
+        <div className="fixed bottom-6 inset-x-0 z-30 flex justify-center px-4 pointer-events-auto">
+          <div className="w-full max-w-md rounded-2xl border border-amber-200 bg-white/95 p-4 shadow-xl backdrop-blur">
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-amber-100 p-2 text-amber-700">
+                <AlertTriangle className="h-4 w-4" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-slate-900">
+                  {locationNoticeTitle}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {locationNoticeDescription}
+                </p>
+                {locationError && (
+                  <p className="mt-2 text-xs text-amber-700">{locationError}</p>
+                )}
+                {locationStatus !== "unsupported" && (
+                  <Button
+                    size="sm"
+                    className="mt-3 bg-slate-900 hover:bg-slate-800"
+                    onClick={requestLocationAccess}
+                  >
+                    Enable location
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-            mapRef.current.easeTo({
-              center: [lng, lat],
-              zoom: 15,
-              duration: 800,
-            });
-          }}
-        >
+      {shouldShowLocatingNotice && (
+        <div className="fixed bottom-6 inset-x-0 z-30 flex justify-center px-4 pointer-events-none">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-lg backdrop-blur">
+            <div className="flex items-center gap-3">
+              <div className="rounded-full bg-emerald-100 p-2 text-emerald-700">
+                <LocateFixed className="h-4 w-4 animate-pulse" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-900">
+                  Getting your live location...
+                </p>
+                <p className="text-xs text-slate-600">
+                  Keep GPS on for better trip matching.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="fixed bottom-5 right-5 flex flex-col gap-3 pointer-events-auto z-20">
+        <Button className="p-5" onClick={recenterMap}>
           <Navigation />
         </Button>
-        <Link to={"/profile"}>
-          <Button
-            className="p-5"
-            onClick={() => {
-              if (!coords || !mapRef.current) return;
-              const [lat, lng] = coords;
-
-              mapRef.current.easeTo({
-                center: [lng, lat],
-                zoom: 15,
-                duration: 800,
-              });
-            }}
-          >
+        <Link to="/profile">
+          <Button className="p-5" onClick={recenterMap}>
             <User />
           </Button>
         </Link>
@@ -175,7 +278,7 @@ function Live({ isDriverLive, setIsOnline }: LiveProps) {
 
       {isDriverLive && (
         <div className="fixed top-6 inset-x-0 flex justify-center pointer-events-auto z-20">
-          <button onClick={() => setIsOnline(false)} className="btn-donate">
+          <button onClick={handleGoOffline} className="btn-donate">
             Go offline
           </button>
         </div>
@@ -221,7 +324,7 @@ function Live({ isDriverLive, setIsOnline }: LiveProps) {
             <div className="flex gap-3 pt-2">
               <Button
                 className="flex-1 bg-green-600 hover:bg-green-700"
-                onClick={() => acceptTrip(trip_request_data.trip_id)}
+                onClick={acceptTrip}
               >
                 Accept
               </Button>

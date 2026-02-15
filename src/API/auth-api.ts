@@ -70,7 +70,7 @@ export function useGetDriverInfo() {
 
   return mutation;
 }
-
+  
 export function useUpdateUserLocationRedis() {
   const updateUserLocationRedis = async (
     data: UpdateUserLocationRedisRequest,

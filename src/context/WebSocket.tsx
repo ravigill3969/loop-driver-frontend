@@ -55,7 +55,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     if (!user?.user_id) return;
 
     const ws = new WebSocket(
-      `ws://localhost:8080/ws?driver_id=${user.user_id}`,
+      `ws://localhost/driver/ws?driver_id=${user.user_id}`,
     );
 
     wsRef.current = ws;

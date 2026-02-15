@@ -12,4 +12,5 @@ function AuthedMapShell() {
   return <MapShell />;
 }
 
+
 export default AuthedMapShell;

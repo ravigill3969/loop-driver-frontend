@@ -64,3 +64,21 @@ export interface GoingOfflineResponseError{
 export interface GoingOfflineResponse {
   success: boolean;
 }
+
+export type RegisterStateT = {
+  driver_details: {
+    phone_number: string;
+    license_number: string;
+    vehicle_type: string;
+    vehicle_make: string;
+    vehicle_model: string;
+    vehicle_color: string;
+    license_plate: string;
+  };
+  user_details: {
+    email: string;
+    password: string;
+    full_name: string;
+    phone_number: string;
+  };
+};

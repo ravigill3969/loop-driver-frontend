@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import Login from "./page/Login";
 import Home from "./page/Home";
+import Register from "./page/Register";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "./context/userContext";
@@ -47,6 +48,7 @@ function App() {
                   }
                 />
                 <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
               </Routes>
             </WebSocketProvider>
           </MapProvider>

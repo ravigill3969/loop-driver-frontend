@@ -150,6 +150,7 @@ export default function OnRoute() {
     if (routedDriverOriginRef.current) return;
 
     routedDriverOriginRef.current = driverOrigin;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRoutedDriverOrigin(driverOrigin);
   }, [driverOrigin]);
 
@@ -287,6 +288,7 @@ export default function OnRoute() {
       driverTripStatus?.status === "on_route" ||
       activeTrip?.status === "on_route";
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRoutePhase(shouldStartDropoff ? "to_dropoff" : "to_pickup");
   }, [
     activeTrip?.status,

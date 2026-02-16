@@ -6,6 +6,7 @@ import type {
   GetDriverStatusFroRedisError,
   GoingOfflineResponse,
   GoingOfflineResponseError,
+  RegisterStateT,
   UpdateUserLocationRedisRequest,
 } from "./auth-api-types";
 
@@ -46,6 +47,42 @@ export function useLogin() {
   return mutation;
 }
 
+export function useRegister() {
+  const queryClient = useQueryClient();
+  const register = async (data: RegisterStateT) => {
+    console.log(backend_url);
+    const res = await fetch(`${backend_url}/api/v1/auth/register`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    const response = await res.json();
+
+    if (!res.ok) {
+      throw new Error("Register error");
+    }
+
+    return response;
+  };
+  const mutation = useMutation({
+    mutationKey: ["register"],
+    mutationFn: register,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["getDriverInfo"] });
+      //   navigate("/");
+    },
+    // onError: (err) => {
+    //   console.log("ERROR FIRED", err);
+    // },
+  });
+
+  return mutation;
+}
+
 export function useGetDriverInfo() {
   const getDriverInfo = async (): Promise<DriverResponse> => {
     console.log(backend_url);
@@ -70,7 +107,7 @@ export function useGetDriverInfo() {
 
   return mutation;
 }
-  
+
 export function useUpdateUserLocationRedis() {
   const updateUserLocationRedis = async (
     data: UpdateUserLocationRedisRequest,

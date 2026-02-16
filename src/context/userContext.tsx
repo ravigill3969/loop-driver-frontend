@@ -6,7 +6,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { useGetDriverInfo } from "@/API/auth-api";
 import { backend_url } from "@/global/env";
 import type { DriverDetails, UserDetails } from "@/API/auth-api-types";
@@ -29,6 +29,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     null
   );
   const navigate = useNavigate();
+  const location = useLocation();
+  const isPublicAuthRoute =
+    location.pathname === "/login" || location.pathname === "/register";
 
   // Fetch user info
   const { data, isLoading, refetch, isError, isFetching } = useGetDriverInfo();
@@ -47,9 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isError && !isLoading) {
       setUser(null);
       set_driver_details(null);
-      navigate("/login");
+      if (!isPublicAuthRoute) {
+        navigate("/login");
+      }
     }
-  }, [isError, isLoading, navigate]);
+  }, [isError, isLoading, isPublicAuthRoute, navigate]);
 
   const updateUser = (userData: Partial<UserDetails>) => {
     setUser((prev) =>

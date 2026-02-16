@@ -54,10 +54,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user?.user_id) return;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 
     const ws = new WebSocket(
-      `${protocol}//${window.location.host}/driver/ws?driver_id=${user.user_id}`,
+      `wss://loop-ride-drive.com/driver/ws?driver_id=${user.user_id}`,
     );
     wsRef.current = ws;
 

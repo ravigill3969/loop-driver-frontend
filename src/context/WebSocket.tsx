@@ -54,10 +54,11 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user?.user_id) return;
 
-    const ws = new WebSocket(
-      `ws://localhost/driver/ws?driver_id=${user.user_id}`,
-    );
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 
+    const ws = new WebSocket(
+      `${protocol}//${window.location.host}/driver/ws?driver_id=${user.user_id}`,
+    );
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -87,7 +88,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         if (data.type === "TRIP_CANCELED_BY_RIDER") {
           set_trip_request_data(null);
           set_showpop_up(false);
-          hardReloadHome()
+          hardReloadHome();
         }
       } catch (err) {
         console.error("Invalid WS payload", err);

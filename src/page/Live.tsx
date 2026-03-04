@@ -21,6 +21,7 @@ const DEFAULT_MAP_CENTER: [number, number] = [-79.383184, 43.653226];
 function Live({ isDriverLive, setIsOnline }: LiveProps) {
   const { driver_details, user } = useAuth();
   const { mutate } = useAcceptTripRequest();
+
   const {
     latLng: liveCoords,
     error: locationError,
@@ -143,18 +144,13 @@ function Live({ isDriverLive, setIsOnline }: LiveProps) {
         locationIntervalRef.current = null;
       }
     };
-  }, [
-    driver_details,
-    isDriverLive,
-    sendDriverLocationUpdate,
-    hasLiveCoords,
-  ]);
+  }, [driver_details, isDriverLive, sendDriverLocationUpdate, hasLiveCoords]);
 
   function acceptTrip() {
     if (trip_request_data) {
       mutate(
         {
-          driver_id: trip_request_data?.driver_id,
+          driver_id: user!.user_id,
           trip_id: trip_request_data?.trip_id,
         },
         {
@@ -166,10 +162,11 @@ function Live({ isDriverLive, setIsOnline }: LiveProps) {
     }
   }
 
-  function rejectTrip(tripId: string) {
+  function rejectTrip(tripId: string, driverId: string) {
     send({
       type: "TRIP_REJECTED",
       trip_id: tripId,
+      driver_id: driverId,
     });
   }
 
@@ -332,7 +329,12 @@ function Live({ isDriverLive, setIsOnline }: LiveProps) {
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => rejectTrip(trip_request_data.trip_id)}
+                onClick={() =>
+                  rejectTrip(
+                    trip_request_data.trip_id,
+                    trip_request_data.driver_id,
+                  )
+                }
               >
                 Reject
               </Button>

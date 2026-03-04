@@ -125,6 +125,7 @@ export function useUpdateTripStatus() {
   });
   return mutate;
 }
+
 export function useDropOffRider() {
   const updateTripStatus = async (data: DropOffTripStatusI) => {
     const response = await fetch(

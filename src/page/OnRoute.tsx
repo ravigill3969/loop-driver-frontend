@@ -536,6 +536,8 @@ export default function OnRoute() {
     }
   };
 
+  console.log(trip_request_data);
+
   /* ---------------- UI ---------------- */
   return (
     <div className="pointer-events-none fixed inset-0">
@@ -665,6 +667,19 @@ export default function OnRoute() {
 
             {/* Action Button */}
             {routePhase === "to_pickup" ? (
+              //haversine
+              //
+              //
+              // /
+              //
+              //
+              //
+              //
+              //
+              //
+              //
+              //
+              //
               <Button
                 className="w-full h-12 bg-black hover:bg-gray-900 text-white font-semibold text-base rounded-lg transition-colors"
                 onClick={() => {

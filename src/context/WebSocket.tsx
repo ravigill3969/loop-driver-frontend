@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { useAuth } from "./userContext";
+import { backend_url } from "@/global/env";
 
 export interface TripRequestDataI {
   type: string;
@@ -54,10 +55,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user?.user_id) return;
 
-
-    const ws = new WebSocket(
-      `wss://loop-ride-drive.com/driver/ws?driver_id=${user.user_id}`,
-    );
+    const ws = new WebSocket(`${backend_url}/ws?driver_id=${user.user_id}`);
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -97,8 +95,6 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     return () => {
       ws.close();
       wsRef.current = null;
-      // set_showpop_up(false);
-      // set_trip_request_data(null);
     };
   }, [user?.user_id]);
 
